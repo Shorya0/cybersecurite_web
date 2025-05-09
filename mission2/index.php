@@ -85,32 +85,38 @@
 
     <?php
     $env = parse_ini_file('.env');
-    $conn = new mysqli($env["SERVERNAME"], $env["USERNAME"], $env["PASSWORD"]);
+    $conn = new mysqli($env["SERVERNAME"], $env["USERNAME"], $env["PASSWORD"], $env["DATABASE"]);
+
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    // Handle form submission securely
+    if ($_SERVER["REQUEST_METHOD"] === "POST" && !empty($_POST["comment"])) {
+        $comment = $_POST["comment"];
+
+        $stmt = $conn->prepare("INSERT INTO comment (content) VALUES (?)");
+        $stmt->bind_param("s", $comment);
+        $stmt->execute();
+        $stmt->close();
+    }
     ?>
 
-    <form action="/" method="post">
+    <form action="index.php" method="post">
         <input type="text" name="comment" placeholder="Ajouter un post..." required>
         <button type="submit">Ajouter</button>
     </form>
 
     <div class="comment-section">
         <?php
-        $sql = "USE {$env["DATABASE"]}";
-        $conn->query($sql);
-
-        if ($_SERVER["REQUEST_METHOD"] === "POST") {
-            $sql = "INSERT INTO comment (content) VALUES ('{$_POST["comment"]}')";
-            $conn->query($sql);
-        }
-
-        $sql = "SELECT * FROM comment ORDER BY id DESC"; // plus récent d'abord
+        $sql = "SELECT * FROM comment ORDER BY id DESC";
         $result = $conn->query($sql);
 
         if ($result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 echo "<div class='comment'>";
                 echo "<div class='id'>#{$row["id"]}</div>";
-                echo "<div class='content'>" . $row["content"] . "</div>";
+                echo "<div class='content'>" . htmlspecialchars($row["content"]) . "</div>";
                 echo "</div>";
             }
         } else {
