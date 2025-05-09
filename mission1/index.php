@@ -58,7 +58,7 @@
     </style>
 </head>
 <body>
-    <form action="/" method="post">
+    <form action="index.php" method="post">
         <h2 style="text-align:center;">Connexion</h2>
         <input type="text" name="email" placeholder="Email" required>
         <input type="password" name="password" placeholder="Mot de passe" required>
@@ -67,24 +67,43 @@
         <?php
         if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $env = parse_ini_file('.env');
-            $conn = new mysqli($env["SERVERNAME"], $env["USERNAME"], $env["PASSWORD"]);
+            
+            // Create a secure database connection
+            $conn = new mysqli($env["SERVERNAME"], $env["USERNAME"], $env["PASSWORD"], $env["DATABASE"]);
+            
+            if ($conn->connect_error) {
+                die("Connection failed: " . $conn->connect_error);
+            }
 
             if ($_POST["email"] && $_POST["password"]) {
-                $sql = "USE {$env["DATABASE"]}";
-                $conn->query($sql);
-                $sql = "SELECT * FROM user WHERE email='{$_POST["email"]}' AND password='{$_POST["password"]}'";
-                $result = $conn->query($sql);
+                // Prepared statement to prevent SQL injection
+                $stmt = $conn->prepare("SELECT * FROM user WHERE email=?");
+                $stmt->bind_param("s", $_POST["email"]);
+                $stmt->execute();
+                $result = $stmt->get_result();
 
                 if ($result->num_rows > 0) {
-                    header('Location: dashboard.php');
-                    exit();
+                    $user = $result->fetch_assoc();
+
+                    // Verify password hash
+                    if (password_verify($_POST["password"], $user["password"])) {
+                        header('Location: dashboard.php');
+                        exit();
+                    } else {
+                        echo "<div class='error'>Email ou mot de passe incorrect</div>";
+                    }
                 } else {
                     echo "<div class='error'>Email ou mot de passe incorrect</div>";
                 }
+
+                $stmt->close();
             }
             $conn->close();
         }
         ?>
     </form>
 </body>
+
 </html>
+
+
